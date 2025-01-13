@@ -42,7 +42,14 @@ class BorrowRecordsController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $borrow_record = BorrowRecords::with(['user', 'book'])
+        ->where('id', $id)
+        ->get();
+
+        return response()->json([
+            'message' => 'Data peminjaman berhasil diambil.',
+            'data' => $borrow_record
+        ]);
     }
 
     /**
@@ -65,12 +72,12 @@ class BorrowRecordsController extends Controller
         }
 
         $request->validate([
-            'borrow_status' => 'required|in:returned',
+            'borrow_status' => 'required',
         ]);
 
         $borrow_records->update([
             'returned_at' => now(),
-            'borrow_status' => 'returned',
+            'borrow_status' => $request->borrow_status,
         ]);
 
         return response()->json([

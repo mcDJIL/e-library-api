@@ -15,6 +15,11 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     //superadmin & admin
+    Route::get('peminjam', [UserController::class, 'getPeminjam']);
+    Route::post('peminjam', [UserController::class, 'addPeminjam']);
+    Route::get('peminjam/{id}', [UserController::class, 'showPeminjam']);
+    Route::put('peminjam/{id}', [UserController::class, 'updatePeminjam']);
+    Route::delete('peminjam/{id}', [UserController::class, 'destroyPeminjam']);
     Route::apiResource('users', UserController::class);
     Route::apiResource('books', BooksController::class);
     Route::apiResource('categories', CategoriesController::class);

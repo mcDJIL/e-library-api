@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Categories;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class CategoriesController extends Controller
 {
     // Get all categories
     public function index()
     {
-        $categories = Categories::all();
+        $categories = Categories::orderBy('name', 'asc')->get();
 
         return response()->json([
             'message' => 'Daftar kategori berhasil diambil.',
@@ -22,9 +24,16 @@ class CategoriesController extends Controller
     // Create a new category
     public function store(Request $request)
     {
-        $request->validate([
+        $validation = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
         ]);
+
+        if ($validation->fails())
+            {
+                return response()->json([
+                    'message' => Str::ucfirst($validation->errors()->first()),
+                ], 422);
+            }
 
         $category = Categories::create([
             'name' => $request->name,
@@ -57,9 +66,16 @@ class CategoriesController extends Controller
             return response()->json(['message' => 'Kategori tidak ditemukan'], 404);
         }
 
-        $request->validate([
+        $validation = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
         ]);
+
+        if ($validation->fails())
+            {
+                return response()->json([
+                    'message' => Str::ucfirst($validation->errors()->first()),
+                ], 422);
+            }
 
         $category->update([
             'name' => $request->name,

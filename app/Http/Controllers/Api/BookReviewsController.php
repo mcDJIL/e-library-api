@@ -16,7 +16,7 @@ class BookReviewsController extends Controller
         $book_reviews = BookReviews::with(['user', 'book'])->get();
 
         return response()->json([
-            'message' => 'Daftar peminjaman berhasil diambil.',
+            'message' => 'Daftar ulasan buku berhasil diambil.',
             'data' => $book_reviews
         ]);
     }

@@ -15,7 +15,7 @@ class BooksController extends Controller
     // Get all books
     public function index()
     {
-        $books = Books::with('categories')->get();
+        $books = Books::with('categories')->orderBy('title', 'asc')->get();
 
         return response()->json([
             'message' => 'Daftar buku berhasil diambil.',
