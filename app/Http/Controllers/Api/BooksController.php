@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BookCollections;
 use App\Models\Books;
+use App\Models\BorrowRecords;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -184,5 +188,244 @@ class BooksController extends Controller
         return response()->json([
             'message' => 'Buku berhasil dihapus.'
         ]);
+    }
+
+    public function getAllBook(Request $request)
+    {
+        $name = $request->query('name');
+        $user = User::where('name', $name)->first();
+        
+        // Query dasar untuk mengambil semua buku
+        $query = Books::with('categories')
+            ->with('borrowRecords');
+        
+        // Jika pengguna login, tambahkan relasi bookCollections
+        if ($user) {
+            $query->with(['bookCollections' => function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            }]);
+        }
+        
+        // Eksekusi query
+        $books = $query->get();
+        
+        return response()->json([
+            'data' => $books->map(function ($book) use ($user) {
+                
+                return [
+                    'id' => $book->id,
+                    'title' => $book->title,
+                    'description' => $book->description,
+                    'author' => $book->author,
+                    'publisher' => $book->publisher,
+                    'published_at' => $book->published_at,
+                    'book_cover' => $book->book_cover,
+                    'availability_status' => $book->availability_status,
+                    'favorite_book' => $user ? !$book->bookCollections->isEmpty() : false,
+                ];
+            }),
+        ]);
+    }
+
+    public function getAllCollectionBook()
+    {
+        $user = Auth::user();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+                'status' => 401
+            ], 401);
+        }
+
+        // Query untuk mengambil hanya buku yang difavoritkan
+        $query = Books::with(['categories', 'bookReviews'])
+            ->withAvg('bookReviews as rating_average', 'rating')
+            ->withCount('bookReviews as total_reviews')
+            ->whereHas('bookCollections', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            });
+
+        // Eksekusi query
+        $books = $query->get();
+        
+        return response()->json([
+            'status' => 200,
+            'total' => $books->count(),
+            'data' => $books->map(function ($book) {
+                return [
+                    'id' => $book->id,
+                    'title' => $book->title,
+                    'description' => $book->description,
+                    'author' => $book->author,
+                    'publisher' => $book->publisher,
+                    'published_at' => $book->published_at,
+                    'book_cover' => $book->book_cover,
+                    'availability_status' => $book->availability_status,
+                    'rating' => [
+                        'average' => round($book->rating_average ?? 0, 1),
+                        'total_reviews' => $book->total_reviews
+                    ],
+                    'categories' => $book->categories->map(function($category) {
+                        return [
+                            'id' => $category->id,
+                            'name' => $category->name
+                        ];
+                    })
+                ];
+            }),
+        ]);
+    }
+
+    public function detailBook(Request $request, $id)
+    {
+        $name = $request->query('name');
+        $user = User::where('name', $name)->first();
+
+        // Base query to retrieve the book with relationships
+        $query = Books::with(['categories', 'borrowRecords', 'bookReviews'])
+            ->where('id', $id);
+
+        // Add favorite_book count if user is logged in
+        if ($user) {
+            $query->withCount([
+                'bookCollections as favorite_book' => function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                },
+            ]);
+        }
+
+        // Calculate average rating using withAvg
+        $query->withAvg('bookReviews as rating_average', 'rating');
+
+        // Execute the query
+        $book = $query->first();
+
+        // If no book is found, return a 404 response
+        if (!$book) {
+            return response()->json([
+                'message' => 'Book not found'
+            ], 404);
+        }
+
+        // Get total reviews count
+        $totalReviews = $book->bookReviews->count();
+
+        // Format the response
+        return response()->json([
+            'data' => [
+                'id' => $book->id,
+                'title' => $book->title,
+                'description' => $book->description,
+                'author' => $book->author,
+                'publisher' => $book->publisher,
+                'published_at' => $book->published_at,
+                'book_cover' => $book->book_cover,
+                'rating' => [
+                    'average' => round($book->rating_average ?? 0, 1), // Round to 1 decimal place
+                    'total_reviews' => $totalReviews
+                ],
+                'availability_status' => $book->availability_status,
+                'favorite_book' => $user ? $book->favorite_book > 0 : null,
+                'categories' => $book->categories->map(function($category) {
+                    return [
+                        'id' => $category->id,
+                        'name' => $category->name
+                    ];
+                })
+            ],
+        ]);
+    }
+
+    public function borrowBook(Request $request, $id)
+    {
+        $book = Books::with('borrowRecords')
+        ->where('id', $id)
+        ->first();
+        
+        $user = Auth::user();
+
+        if (!$book) {
+            return response()->json([
+                'message' => 'Buku tidak ditemukan.'
+            ], 404);
+        }
+
+        if ($book->availability_status == 'Buku Sedang Dipinjam')
+        {
+            return response()->json([
+                'message' => 'Mohon maaf buku tidak bisa dipinjam!'
+            ], 403);
+        }
+
+        $borrow = BorrowRecords::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'borrowed_at' => now(),
+            'borrow_status' => 'borrowed',
+        ]);
+
+        if ($borrow)
+        {
+            return response()->json([
+                'message' => 'Buku berhasil dipinjam. Silahkan datang ke petugas untuk konfirmasi!'
+            ], 200);
+        }
+    }
+
+    public function addFavoriteBook($id)
+    {
+        $book = Books::where('id', $id)
+        ->first();
+
+        if (!$book)
+        {
+            return response()->json([
+                'message' => 'Buku tidak ditemukan'
+            ], 404);
+        }
+        
+        $user = Auth::user();
+
+        BookCollections::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+        ]);
+
+        return response()->json([
+            'message' => 'Berhasil menambahkan ke koleksi buku'
+        ], 200);
+    }
+
+    public function removeFavoriteBook($id)
+    {
+        $book = Books::where('id', $id)
+        ->first();
+
+        if (!$book)
+        {
+            return response()->json([
+                'message' => 'Buku tidak ditemukan'
+            ], 404);
+        }
+        
+        $user = Auth::user();
+        
+        $collection = BookCollections::where('user_id', $user->id)
+        ->where('book_id', $book->id)
+        ->first();
+        
+        if (!$collection)
+        {
+            return response()->json([
+                'message' => 'Koleksi buku tidak ada'
+            ], 404);
+        }
+
+        $collection->delete();
+
+        return response()->json([
+            'message' => 'Berhasil menghapus koleksi buku'
+        ], 200);
     }
 }

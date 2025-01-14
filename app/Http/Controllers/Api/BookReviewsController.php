@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BookReviews;
+use App\Models\Books;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class BookReviewsController extends Controller
 {
@@ -21,51 +25,48 @@ class BookReviewsController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function getReview($id)
     {
-        //
+        $book_reviews = BookReviews::with(['user', 'book'])
+        ->where('book_id', $id)
+        ->get();
+
+        return response()->json([
+            'message' => 'Daftar ulasan buku berhasil diambil.',
+            'data' => $book_reviews
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function sendReview(Request $request, $id)
     {
-        //
-    }
+        $user = Auth::user();
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
+        $book = Books::find($id);
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
+        $validation = Validator::make($request->all(), [
+            'review' => 'required',
+            'rating' => 'required',
+        ]);
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
+        if ($validation->fails())
+        {
+            return response()->json([
+                'message' => Str::ucfirst($validation->errors()->first())
+            ], 422);
+        }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        $send = BookReviews::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'review' => $request->review,
+            'rating' => $request->rating,
+        ]);
+
+        if ($send)
+        {
+            return response()->json([
+                'message' => 'Berhasil mengirim ulasan'
+            ], 200);
+        }
     }
 }
