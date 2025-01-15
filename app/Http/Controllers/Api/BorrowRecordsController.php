@@ -93,4 +93,16 @@ class BorrowRecordsController extends Controller
     {
         //
     }
+
+    public function report()
+    {
+        $borrow_records = BorrowRecords::with(['user', 'book'])
+        ->whereNotNull('returned_at')
+        ->get();
+
+        return response()->json([
+            'message' => 'Daftar peminjaman berhasil diambil.',
+            'data' => $borrow_records
+        ]);
+    }
 }

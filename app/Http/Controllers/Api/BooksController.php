@@ -428,4 +428,17 @@ class BooksController extends Controller
             'message' => 'Berhasil menghapus koleksi buku'
         ], 200);
     }
+
+    public function getPopularBook()
+    {
+        $books = Books::withCount('borrowRecords')
+        ->orderBy('borrow_records_count', 'desc')
+        ->take(4)
+        ->get();
+
+        return response()->json([
+            "message" => "Daftar buku populer berhasil diambil",
+            "data" => $books
+        ]);
+    }
 }
