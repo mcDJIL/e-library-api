@@ -17,7 +17,9 @@ class BookReviewsController extends Controller
      */
     public function index()
     {
-        $book_reviews = BookReviews::with(['user', 'book'])->get();
+        $book_reviews = BookReviews::with(['user', 'book'])
+        ->orderBy('created_at', 'desc')
+        ->get();
 
         return response()->json([
             'message' => 'Daftar ulasan buku berhasil diambil.',

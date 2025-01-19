@@ -354,7 +354,7 @@ class BooksController extends Controller
         if ($book->availability_status == 'Buku Sedang Dipinjam')
         {
             return response()->json([
-                'message' => 'Mohon maaf buku tidak bisa dipinjam!'
+                'message' => 'Mohon maaf buku sedang dipinjam!'
             ], 403);
         }
 
